@@ -23,12 +23,11 @@ Control Subway Surfers using hand gestures via webcam using Python, MediaPipe, a
 pip install mediapipe opencv-python
 
 📱 Run the script
-Make sure BlueStacks is running with Subway Surfers opened:
-python subwaySurfers.py
+- Make sure BlueStacks is running with Subway Surfers opened:
+- python subwaySurfers.py
 
 💡 Notes
-Make sure adb is connected to 127.0.0.1:5555 (BlueStacks)
-
-Keep only one hand visible for best accuracy
+- Make sure adb is connected to 127.0.0.1:5555 (BlueStacks)
+- Keep only one hand visible for best accuracy
 
 🙌 Made with passion by Sahaj Dang
