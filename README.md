@@ -1,6 +1,6 @@
 # Gesture-Controlled Subway Surfers 🎮
 
-Control Subway Surfers using hand gestures via webcam using Python, MediaPipe, and ADB.
+**Control Subway Surfers using hand gestures via webcam using Python, MediaPipe, and ADB.**
 
 ## 🚀 Features
 - Raise your hand to **jump**
