@@ -1,79 +1,82 @@
 import cv2
 import mediapipe as mp
+import keyboard as kb
 import time
-import os
 
-# Initialize MediaPipe Hands
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
-
-# Webcam feed
+# Setup webcam and MediaPipe Hands
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
+mp_draw = mp.solutions.drawing_utils
 
-# Gesture logic
-def get_gesture(landmarks):
-    wrist = landmarks[0]
-    index_tip = landmarks[8]
+# Gesture detection logic
+def get_finger_pattern(hand_landmarks):
+    fingers_up = []
 
-    x_diff = index_tip.x - wrist.x
-    y_diff = index_tip.y - wrist.y
+    # Index Finger
+    fingers_up.append(hand_landmarks.landmark[8].y < hand_landmarks.landmark[6].y)
+    # Middle Finger
+    fingers_up.append(hand_landmarks.landmark[12].y < hand_landmarks.landmark[10].y)
+    # Ring Finger
+    fingers_up.append(hand_landmarks.landmark[16].y < hand_landmarks.landmark[14].y)
+    # Pinky Finger
+    fingers_up.append(hand_landmarks.landmark[20].y < hand_landmarks.landmark[18].y)
 
-    if y_diff < -0.2:
-        return 'up'
-    elif y_diff > 0.2:
-        return 'down'
-    elif x_diff < -0.2:
-        return 'left'
-    elif x_diff > 0.2:
-        return 'right'
-    return None
+    return fingers_up  # [Index, Middle, Ring, Pinky]
 
-# ADB Swipe Functions
-def swipe_up():
-    os.system("adb shell input swipe 500 1200 500 500 200")
-
-def swipe_down():
-    os.system("adb shell input swipe 500 800 500 1300 200")
-
-def swipe_left():
-    os.system("adb shell input swipe 700 1000 200 1000 200")
-
-def swipe_right():
-    os.system("adb shell input swipe 300 1000 800 1000 200")
-
-# Main Loop
-last_action_time = time.time()
-cooldown = 1  # seconds
+# Variables to prevent rapid key spamming
+prev_pattern = ""
+action_text = ""
+last_action_time = 0
+cooldown = 0.2  # seconds between actions
 
 while True:
-    success, img = cap.read()
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    result = hands.process(img_rgb)
+    success, frame = cap.read()
+    if not success:
+        break
+
+    frame = cv2.flip(frame, 1)
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    result = hands.process(rgb)
 
     if result.multi_hand_landmarks:
-        for handLms in result.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(img, handLms, mp_hands.HAND_CONNECTIONS)
-            landmarks = handLms.landmark
-            gesture = get_gesture(landmarks)
+        for hand_landmarks in result.multi_hand_landmarks:
+            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+            pattern = get_finger_pattern(hand_landmarks)
+            pattern_str = ''.join(['1' if f else '0' for f in pattern])
+            current_time = time.time()
 
-            now = time.time()
-            if gesture and now - last_action_time > cooldown:
-                print(f"Gesture detected: {gesture}")
-                if gesture == 'up':
-                    swipe_up()
-                elif gesture == 'down':
-                    swipe_down()
-                elif gesture == 'left':
-                    swipe_left()
-                elif gesture == 'right':
-                    swipe_right()
-                last_action_time = now
+            if pattern_str != prev_pattern and current_time - last_action_time > cooldown:
+                prev_pattern = pattern_str
+                last_action_time = current_time
 
-    cv2.imshow("Hand Gesture Controller", img)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+                if pattern_str == "1000":  # Only Index
+                    kb.press_and_release('up')
+                    action_text = "🟢 Jump"
+
+                elif pattern_str == "1100":  # Index + Middle
+                    kb.press_and_release('down')
+                    action_text = "🔵 Roll"
+
+                elif pattern_str == "1110":  # Index + Middle + Ring
+                    kb.press_and_release('right')
+                    action_text = "🟡 Right"
+
+                elif pattern_str == "1111":  # All 4 fingers
+                    kb.press_and_release('left')
+                    action_text = "🟠 Left"
+
+                else:
+                    action_text = "👀 Unknown gesture"
+
+    # Show detected action on screen
+    if action_text:
+        cv2.putText(frame, f"Detected: {action_text}", (20, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 3)
+
+    cv2.imshow("Subway Surfers Hand Control", frame)
+
+    if cv2.waitKey(1) & 0xFF == 27:  # ESC to exit
         break
 
 cap.release()
